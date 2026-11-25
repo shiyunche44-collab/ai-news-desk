@@ -4,8 +4,11 @@
 #   避开整点，整点是 GitHub 定时任务最挤的时候；这个时段也在 DeepSeek 的半价时段里。
 # - 模型：仓库 Secrets 里有 DEEPSEEK_API_KEY 就用 DeepSeek，没有再看 DASHSCOPE_API_KEY（通义千问），
 #   都没有就用模拟模型 mock，照样能跑通。key 只通过环境变量传给程序，日志里不会打印。
-# - 草稿：存成这次运行的产物（Artifacts，保留 30 天），同时贴在运行页面的 Summary 里。
-#   不提交回仓库：草稿没经过人审，不该进代码历史。公开仓库的运行页面和产物别人也能看到。
+# - 草稿：每次跑完存进仓库的 drafts/ 文件夹（一次运行一个文件，按台北日期命名），
+#   同时存成这次运行的产物（Artifacts，保留 30 天），也贴在运行页面的 Summary 里。
+#   存之前先查一遍：要公开的文件里只要出现 key 或像 key 的字符串，这次就不存、不上传。
+#   草稿没经过人审，标 ✗ 的事实没核对上。公开仓库谁都能看到 drafts/、运行页面和产物。
+# - 权限：跑流程的那个任务只有只读权限；只有最后「存进仓库」那个任务能写仓库，而且它拿不到模型 key。
 # - 系统不会自动发布任何内容。
 name: daily
 
@@ -40,6 +43,8 @@ jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      model: ${{ steps.pick.outputs.model }}
     steps:
       - uses: actions/checkout@v4
 
@@ -119,6 +124,29 @@ jobs:
         run: |
           newsroom review export --run latest --out out/drafts
           newsroom cost > cost.log || true
+
+      # 只比对、不打印：key 只要出现在任何要公开的文件里，这一步就失败，后面不贴 Summary、不上传、不存进仓库
+      - name: 检查要公开的文件里没有 key
+        id: guard
+        if: always() && steps.run.outcome == 'success'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        run: |
+          for k in "$DEEPSEEK_API_KEY" "$DASHSCOPE_API_KEY"; do
+            [ -n "$k" ] || continue
+            if grep -rqF -- "$k" out/drafts run.log cost.log 2>/dev/null; then
+              echo "::error::要公开的文件里出现了 key，这次不公开草稿"; exit 1
+            fi
+          done
+          if grep -rqE 'sk-[A-Za-z0-9]{20,}' out/drafts run.log cost.log 2>/dev/null; then
+            echo "::error::要公开的文件里有像 key 的字符串，这次不公开草稿"; exit 1
+          fi
+          echo "没有发现 key"
+
+      - name: 草稿贴进 Summary
+        if: always() && steps.guard.outcome == 'success'
+        run: |
           {
             echo "## 每日运行（模型：${{ steps.pick.outputs.model }}）"
             echo '```'
@@ -135,7 +163,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 上传草稿
-        if: always() && steps.run.outcome == 'success'
+        if: always() && steps.guard.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: drafts-${{ github.run_number }}
@@ -152,3 +180,61 @@ jobs:
         with:
           path: data/newsroom.db
           key: newsroom-db-${{ steps.pick.outputs.model }}-${{ github.run_id }}
+
+  # 把这次的草稿存进仓库的 drafts/ 文件夹。这个任务能写仓库，但拿不到模型 key，
+  # 只用上一步检查过、上传好的草稿文件。用自带的 GITHUB_TOKEN 推送，不会再触发别的工作流。
+  save-drafts:
+    needs: run
+    if: needs.run.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: drafts-${{ github.run_number }}
+          path: artifact
+
+      - name: 存进 drafts/
+        env:
+          MODEL: ${{ needs.run.outputs.model }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          shopt -s nullglob
+          files=(artifact/out/drafts/*.md)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "这次没有草稿，不提交"
+            exit 0
+          fi
+          day=$(TZ=Asia/Taipei date +%F)
+          out="drafts/${day}-run${RUN_NUMBER}.md"
+          mkdir -p drafts
+          {
+            echo "# ${day} 的草稿（运行 #${RUN_NUMBER}，模型：${MODEL}）"
+            echo
+            echo "系统自动生成，没经过人审。标 ✗ 的事实没核对上，发之前要先改。运行页面：${RUN_URL}"
+            echo
+            echo '```'
+            cat artifact/run.log
+            echo '```'
+            for f in "${files[@]}"; do
+              echo
+              echo "---"
+              echo
+              cat "$f"
+            done
+          } > "$out"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$out"
+          git commit -q -m "草稿：${day}（运行 #${RUN_NUMBER}，${#files[@]} 篇）"
+          for i in 1 2 3; do
+            git pull -q --rebase && git push -q && { echo "已存到 $out"; exit 0; }
+            sleep 5
+          done
+          echo "::error::推送失败"
+          exit 1
