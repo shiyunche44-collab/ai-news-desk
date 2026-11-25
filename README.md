@@ -179,7 +179,7 @@ tests/                 77 个测试
 
 `.github/workflows/daily.yml` 每天自动跑一次完整流程，不用自己的服务器，公开仓库免费。
 
-- **时间**：每天台北时间早上 7:17 左右（UTC 23:17）。GitHub 高峰时可能晚几分钟到半小时。
+- **时间**：每天台北时间早上 6:03 左右（UTC 22:03）。GitHub 高峰时可能晚几分钟到半小时。
 - **信息源**：arXiv cs.AI 和 GitHub `topic:llm-agent` 的真实数据，研究员可以读白名单里的网页。
 - **模型**：仓库 Secrets 里有 `DEEPSEEK_API_KEY` 就用 DeepSeek；没有再看 `DASHSCOPE_API_KEY`，有就用通义千问；都没有就用模拟模型，照样能跑通。
 - **去重**：上次的数据库用 Actions 缓存接着用，写过的新闻不会再写。换模型后从头开始。

@@ -1,6 +1,7 @@
 # 每天定时跑一次完整流程：采集真实信息源 → 选题 → 写 → 核查 → 改写，草稿导出成 Markdown。
 #
-# - 时间：每天 UTC 23:17，也就是台北时间早上 7:17（GitHub 高峰时可能晚几分钟到半小时）。
+# - 时间：每天 UTC 22:03，也就是台北时间早上 6:03（GitHub 高峰时可能晚几分钟到半小时）。
+#   避开整点，整点是 GitHub 定时任务最挤的时候；这个时段也在 DeepSeek 的半价时段里。
 # - 模型：仓库 Secrets 里有 DEEPSEEK_API_KEY 就用 DeepSeek，没有再看 DASHSCOPE_API_KEY（通义千问），
 #   都没有就用模拟模型 mock，照样能跑通。key 只通过环境变量传给程序，日志里不会打印。
 # - 草稿：存成这次运行的产物（Artifacts，保留 30 天），同时贴在运行页面的 Summary 里。
@@ -10,7 +11,7 @@ name: daily
 
 on:
   schedule:
-    - cron: "17 23 * * *"
+    - cron: "3 22 * * *"
   workflow_dispatch:
     inputs:
       model:
