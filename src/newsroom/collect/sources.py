@@ -10,6 +10,7 @@ import os
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Protocol
 
 from ..tools.safety import canonical_url, html_to_text, matches_domain, host_of, source_tier
@@ -67,6 +68,17 @@ class FixtureSource:
                           kind=r.get("kind"), fixture=True) for r in rows]
 
 
+def iso_date(value: str | None) -> str | None:
+    """RSS 2.0 的 pubDate 是 RFC 822 格式（Tue, 25 Nov 2026 00:00:00 -0500），统一转成 ISO 8601，
+    和 GitHub、Atom 的时间放在一起才能按时间排序。解析不了就原样保留。"""
+    if not value or not value.strip():
+        return value
+    try:
+        return parsedate_to_datetime(value.strip()).astimezone(timezone.utc).isoformat()
+    except (TypeError, ValueError, IndexError):
+        return value
+
+
 class RSSSource:
     """RSS 2.0 和 Atom 都支持，只用标准库。"""
 
@@ -86,7 +98,7 @@ class RSSSource:
                 title = e.findtext("title") or ""
                 link = e.findtext("link") or ""
                 summary = e.findtext("description") or ""
-                published = e.findtext("pubDate")
+                published = iso_date(e.findtext("pubDate"))
             else:
                 title = e.findtext(f"{atom}title") or ""
                 link_el = e.find(f"{atom}link")

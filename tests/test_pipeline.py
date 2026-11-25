@@ -93,3 +93,14 @@ def test_rss_and_atom_parsing():
     b = src.parse(atom)[0]
     assert a.kind == "paper" and a.tier == "primary" and a.summary == "Abstract"
     assert b.kind == "repo" and b.published == "2026-11-24T00:00:00Z"
+
+
+def test_rss_pubdate_becomes_iso():
+    from newsroom.collect.sources import iso_date
+    rss = b"""<?xml version="1.0"?><rss><channel>
+      <item><title>Paper C</title><link>https://arxiv.org/abs/0000.00001</link>
+      <pubDate>Tue, 25 Nov 2026 00:00:00 -0500</pubDate></item></channel></rss>"""
+    c = RSSSource("https://x", ["arxiv.org"]).parse(rss)[0]
+    # 转成 UTC 的 ISO 8601，才能和 GitHub、Atom 的时间一起排序
+    assert c.published == "2026-11-25T05:00:00+00:00"
+    assert iso_date("昨天") == "昨天" and iso_date(None) is None

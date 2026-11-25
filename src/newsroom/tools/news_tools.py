@@ -6,6 +6,7 @@ agent 被网页里的注入指令带偏，最坏也只是选错题，不可能�
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
@@ -13,7 +14,7 @@ from pydantic import BaseModel, Field
 from ..collect.dedupe import jaccard, shingles
 from ..store import Store
 from .fetcher import PageFetcher
-from .registry import Tool, ToolRegistry
+from .registry import MAX_RESULT_CHARS, Tool, ToolRegistry
 from .safety import wrap_untrusted
 
 
@@ -40,11 +41,16 @@ class SeenArgs(BaseModel):
 def build_news_tools(ctx: ToolContext) -> ToolRegistry:
     def search_items(a: SearchArgs):
         items = ctx.store.search_items(a.query, a.limit, since=ctx.since)
-        return [
+        rows = [
             {"id": it.id, "title": it.title, "url": it.url, "source": it.source, "kind": it.kind,
              "tier": it.tier, "published": it.published, "summary": it.summary[:200]}
             for it in items
         ]
+        # 结果超长会被注册表从中间截断，JSON 就坏了（真实数据的摘要长，20 条就超）。
+        # 所以在这里整条整条地去掉排在后面的，保证返回的始终是完整、能解析的列表。
+        while len(rows) > 1 and len(json.dumps(rows, ensure_ascii=False)) > MAX_RESULT_CHARS:
+            rows.pop()
+        return rows
 
     def fetch_url(a: FetchArgs):
         page = ctx.fetcher.fetch(a.url)

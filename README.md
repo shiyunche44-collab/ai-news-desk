@@ -50,7 +50,7 @@ cd ai-news-desk
 python -m venv .venv && source .venv/bin/activate   # Windows 用 .venv\Scripts\activate
 pip install -e ".[dev]"
 
-pytest                     # 75 个测试
+pytest                     # 77 个测试
 newsroom run               # 用示例数据跑一遍完整流程
 newsroom review list       # 看草稿
 newsroom review show <草稿id>
@@ -152,7 +152,7 @@ src/newsroom/
 data/fixtures/         示例数据（虚构）
 data/voice.md          语气档案：把你写过的好帖子贴进去
 evals/golden.jsonl     金标准样例
-tests/                 75 个测试
+tests/                 77 个测试
 ```
 
 ## 已知限制
