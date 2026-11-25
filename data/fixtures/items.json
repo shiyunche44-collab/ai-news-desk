@@ -1,0 +1,62 @@
+{
+  "_说明": "示例数据：全部是虚构的，公司、模型、网址都是编的，只用来离线跑通流程和测试。不要当成真实新闻发布。",
+  "items": [
+    {
+      "title": "【示例】示例实验室开源 Example-7B 模型，支持 32K 上下文",
+      "url": "https://www.example-lab.cn/blog/example-7b",
+      "source": "示例实验室博客",
+      "published": "2026-11-24T08:00:00+08:00",
+      "summary": "示例实验室开源 7B 参数模型，Apache-2.0 许可，单卡 24GB 可运行。"
+    },
+    {
+      "title": "【示例】示例模型公司把 EM-Pro 的 API 输入价格降低 50%",
+      "url": "https://example-model.cn/news/price-cut?utm_source=newsletter",
+      "source": "示例模型公司官网",
+      "published": "2026-11-24T10:30:00+08:00",
+      "summary": "12 月 1 日起生效，输出价格不变。"
+    },
+    {
+      "title": "【示例】论文：先检索再规划，让 7B 模型的网页 agent 成功率从 41% 提高到 53%",
+      "url": "https://www.example-lab.cn/papers/retrieve-then-plan",
+      "source": "示例实验室论文页",
+      "published": "2026-11-23T20:00:00+08:00",
+      "kind": "paper",
+      "summary": "agent 规划前先检索过去成功的任务记录。"
+    },
+    {
+      "title": "【示例】tiny-agent：200 行 Python 写的 agent 教学框架",
+      "url": "https://github.com/example-org/tiny-agent",
+      "source": "GitHub",
+      "published": "2026-11-22T12:00:00+08:00",
+      "summary": "实现了工具调用、ReAct 循环和步数上限，MIT 许可。"
+    },
+    {
+      "title": "【示例】示例实验室开源Example-7B模型，支持32K上下文！",
+      "url": "https://news.example-media.cn/2026/11/24/example-7b",
+      "source": "示例科技媒体",
+      "published": "2026-11-24T09:15:00+08:00",
+      "summary": "媒体转载示例实验室的开源消息。"
+    },
+    {
+      "title": "【示例】爆料：某大厂下周发布 1000 亿参数的新模型",
+      "url": "https://x.com/example_leaker/status/100000001",
+      "source": "X 上的爆料账号",
+      "published": "2026-11-24T22:00:00+08:00",
+      "summary": "没有任何官方信息。"
+    },
+    {
+      "title": "【示例】独家：示例模型公司正在训练下一代模型",
+      "url": "https://news.example-media.cn/2026/11/24/exclusive",
+      "source": "示例科技媒体",
+      "published": "2026-11-24T18:00:00+08:00",
+      "summary": "援引匿名知情人士。"
+    },
+    {
+      "title": "【示例】tiny-agent：用 200 行 Python 写的 agent 教学框架（转）",
+      "url": "https://github.com/example-org/tiny-agent/?utm_source=x&utm_medium=social",
+      "source": "X 转发",
+      "published": "2026-11-23T09:00:00+08:00",
+      "summary": "和上面那条是同一个仓库。"
+    }
+  ]
+}

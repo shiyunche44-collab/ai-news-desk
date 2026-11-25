@@ -1,0 +1,16 @@
+# 每次提交都跑：单元测试 + 用模拟模型跑一遍评测。不需要任何 key。
+# 接上真实模型后，可以加一个手动触发的任务，用仓库 Secrets 里的 key 跑 --compare。
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pytest
+      - name: 评测回归（分数低于 0.9 就失败）
+        run: newsroom eval --min-score 0.9

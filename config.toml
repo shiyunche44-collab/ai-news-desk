@@ -1,0 +1,110 @@
+# AI 资讯编辑部 配置
+# 密钥永远不写在这里，只从环境变量读（见 .env.example）。
+# 下面的模型名和价格来自方案文档（2026 年 11 月记录），用之前请到官方文档确认。
+
+[app]
+db_path = "data/newsroom.db"
+out_dir = "out"
+# 默认用哪个模型。mock 不需要 key，也不联网；换真实模型时改这里，或者命令行加 --model deepseek
+default_model = "mock"
+voice_profile = "data/voice.md"
+
+# ---------- 模型网关 ----------
+# provider: openai_compat（DeepSeek、通义千问）| anthropic（Claude 对照）| mock
+# api_key_env 是环境变量的名字，不是 key 本身。
+
+[models.mock]
+provider = "mock"
+model = "mock-newsroom-1"
+
+[models.deepseek]
+provider = "openai_compat"
+base_url = "https://api.deepseek.com"
+model = "deepseek-flash"
+api_key_env = "DEEPSEEK_API_KEY"
+# 每百万 token 的价格：方案文档里记录的官方高峰时段价
+price_input_per_m = 0.3
+price_output_per_m = 1.2
+currency = "USD"
+json_mode = true
+echo_reasoning = true
+
+[models.qwen]
+provider = "openai_compat"
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+model = "qwen3.8-max"
+api_key_env = "DASHSCOPE_API_KEY"
+price_input_per_m = 12
+price_output_per_m = 36
+currency = "CNY"
+json_mode = true
+
+[models.claude]
+provider = "anthropic"
+# 只做评测对照。模型名填你要对照的那一个（以 Anthropic 官方模型列表为准），
+# 也可以不改这里，直接设环境变量 CLAUDE_MODEL。
+model = ""
+model_env = "CLAUDE_MODEL"
+api_key_env = "ANTHROPIC_API_KEY"
+price_input_per_m = 0
+price_output_per_m = 0
+currency = "USD"
+
+# ---------- 模型分级 ----------
+# 每个环节用哪个模型。"default" 表示跟随 --model 或 app.default_model。
+# 面试考点：简单活用便宜模型，难活用强模型；换之前先过评测。
+[routing]
+researcher = "default"
+writer = "default"
+fact_checker = "default"
+adapter = "default"
+summarize = "default"
+# 评审模型和被评模型要分开，避免「自己给自己打分」的偏差
+judge = "default"
+
+# ---------- agent 循环 ----------
+[agent]
+max_steps = 8              # 循环上限，防止 ReAct 死循环
+max_repeat_calls = 2       # 同一个工具、同样参数最多调几次
+token_budget = 60000       # 单个 agent 一次任务的 token 上限
+max_retries = 2            # 网关遇到限流、超时时重试几次
+
+# ---------- 信息源 ----------
+# 第一版默认用 data/fixtures 里的示例数据（虚构的，只用于跑通和测试）。
+[[sources]]
+type = "fixture"
+path = "data/fixtures/items.json"
+
+# 真实信息源：在你自己电脑上把 enabled 改成 true。
+[[sources]]
+type = "rss"
+name = "arXiv cs.AI"
+url = "https://rss.arxiv.org/rss/cs.AI"
+enabled = false
+
+[[sources]]
+type = "github"
+name = "GitHub 新 agent 项目"
+query = "topic:llm-agent"
+days = 7
+enabled = false
+
+# ---------- 安全 ----------
+[safety]
+# 一手来源：官方博客、论文、代码仓库。只有二手来源的消息会被标红。
+primary_domains = [
+  "openai.com", "anthropic.com", "deepseek.com", "api-docs.deepseek.com",
+  "qwenlm.github.io", "aliyun.com", "alibabacloud.com", "moonshot.cn",
+  "zhipuai.cn", "bigmodel.cn", "ai.google.dev", "blog.google", "ai.meta.com",
+  "arxiv.org", "github.com", "huggingface.co", "modelscope.cn",
+  # 下面两个是示例数据用的虚构域名
+  "example-lab.cn", "example-model.cn",
+]
+# fetch_url 工具只能访问这些域名（域名白名单，防止 agent 被网页引着乱跑）
+fetch_allowlist = [
+  "openai.com", "anthropic.com", "deepseek.com", "api-docs.deepseek.com",
+  "qwenlm.github.io", "arxiv.org", "github.com", "raw.githubusercontent.com",
+  "api.github.com", "huggingface.co", "modelscope.cn",
+  "example-lab.cn", "example-model.cn", "news.example-media.cn",
+]
+fetch_max_chars = 12000

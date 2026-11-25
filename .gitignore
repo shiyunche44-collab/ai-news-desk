@@ -1,0 +1,11 @@
+# 运行产物
+data/newsroom.db
+out/
+# 密钥只放在本机环境变量或 .env 里，永远不要提交
+.env
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
