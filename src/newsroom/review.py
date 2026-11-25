@@ -38,22 +38,51 @@ def format_draft(d: dict[str, Any], full: bool = True) -> str:
     return "\n".join(lines)
 
 
-def export_markdown(d: dict[str, Any], out_dir: Path) -> Path:
-    """把通过的草稿导出成一个 Markdown 文件，方便复制到各平台。"""
-    out_dir.mkdir(parents=True, exist_ok=True)
+def _final_sections(d: dict[str, Any]) -> list[str]:
+    """成稿部分：正文、来源和各平台版本。"""
     v = d.get("versions") or {}
     xhs = v.get("xiaohongshu", {})
     sources = sorted({c["source_url"] for c in d.get("claims") or []})
-    text = "\n".join([
-        f"# {d['title']}", "", d["body"], "",
+    return [
+        d["body"], "",
         "## 来源", *[f"- {u}" for u in sources], "",
         "## X", v.get("x_post", ""), "",
         f"## 小红书：{xhs.get('title', '')}", xhs.get("body", ""), "",
         " ".join("#" + t for t in xhs.get("tags", [])), "",
         "## 视频号口播稿", v.get("shipinhao_script", ""), "",
-    ])
+    ]
+
+
+def export_markdown(d: dict[str, Any], out_dir: Path) -> Path:
+    """把通过的草稿导出成一个 Markdown 文件，方便复制到各平台。"""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    text = "\n".join([f"# {d['title']}", "", *_final_sections(d)])
     path = out_dir / f"{d['created_at'][:10]}-{d['id']}.md"
     path.write_text(text, encoding="utf-8")
+    return path
+
+
+def export_for_review(d: dict[str, Any], out_dir: Path) -> Path:
+    """把一篇草稿连同提醒和事实核查结果导出成 Markdown，给不在本机的人审（比如 GitHub Actions 的产物）。
+
+    和 export_markdown 的区别：这里是「待审稿」，所以把状态、提醒、每条 claim 的核查结论都带上；
+    export_markdown 导出的是已通过、可以直接复制去发的成稿。
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    marks = {"supported": "✓", "unsupported": "✗", "secondhand": "?"}
+    lines = [f"# {d['title']}", "",
+             f"草稿 id：`{d['id']}`　状态：{STATUS_LABEL.get(d['status'], d['status'])}", ""]
+    flags = d.get("flags") or []
+    if flags:
+        lines += ["## 提醒", *[f"- ⚠ {f}" for f in flags], ""]
+    lines += ["## 事实核查"]
+    for v in (d.get("factcheck") or {}).get("verdicts", []):
+        lines.append(f"- {marks.get(v['status'], '?')} {v['claim']}")
+        if v.get("note"):
+            lines.append(f"  - {v['note']}")
+    lines += ["", "## 正文", *_final_sections(d)]
+    path = out_dir / f"{d['created_at'][:10]}-{d['id']}.md"
+    path.write_text("\n".join(lines), encoding="utf-8")
     return path
 
 

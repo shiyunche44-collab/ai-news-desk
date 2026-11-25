@@ -14,7 +14,7 @@ from newsroom.store import Store
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
     # 防止你本机设过的环境变量影响测试结果
-    for name in ("NEWSROOM_MODEL", "DEEPSEEK_API_KEY", "DASHSCOPE_API_KEY", "ANTHROPIC_API_KEY", "CLAUDE_MODEL"):
+    for name in ("NEWSROOM_MODEL", "NEWSROOM_SOURCES", "DEEPSEEK_API_KEY", "DASHSCOPE_API_KEY", "ANTHROPIC_API_KEY", "CLAUDE_MODEL"):
         monkeypatch.delenv(name, raising=False)
 
 

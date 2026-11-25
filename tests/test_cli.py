@@ -52,3 +52,21 @@ def test_summarize_and_react(run):
     run("collect")
     code, out = run("react", "今天写哪条？")
     assert code == 0 and "Final Answer" in out
+
+
+def test_review_export(run, settings, tmp_path):
+    run("run", "--picks", "2")
+    code, out = run("review", "export", "--out", str(tmp_path / "drafts"))
+    files = sorted((tmp_path / "drafts").glob("*.md"))
+    assert code == 0 and len(files) == 2
+    text = files[0].read_text(encoding="utf-8")
+    # 待审稿要带上提醒和逐条核查结论，成稿部分和 approve 导出的一样
+    for part in ("## 提醒", "示例数据（虚构）", "## 事实核查", "## 正文", "## 来源", "## X", "## 视频号口播稿"):
+        assert part in text
+    code, _ = run("review", "export", "--status", "approved", "--out", str(tmp_path / "none"))
+    assert code == 0 and not list((tmp_path / "none").glob("*.md"))
+    # 再跑一次：--run latest 只导出最近这次运行的草稿，不带上前一次的
+    _, out = run("run", "--picks", "1")
+    n_new = int(out.split("产出草稿 ")[1].split(" 篇")[0])
+    code, _ = run("review", "export", "--run", "latest", "--out", str(tmp_path / "latest"))
+    assert code == 0 and n_new == 1 and len(list((tmp_path / "latest").glob("*.md"))) == 1

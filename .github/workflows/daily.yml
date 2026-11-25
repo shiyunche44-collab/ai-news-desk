@@ -1,0 +1,153 @@
+# 每天定时跑一次完整流程：采集真实信息源 → 选题 → 写 → 核查 → 改写，草稿导出成 Markdown。
+#
+# - 时间：每天 UTC 23:17，也就是台北时间早上 7:17（GitHub 高峰时可能晚几分钟到半小时）。
+# - 模型：仓库 Secrets 里有 DEEPSEEK_API_KEY 就用 DeepSeek，没有再看 DASHSCOPE_API_KEY（通义千问），
+#   都没有就用模拟模型 mock，照样能跑通。key 只通过环境变量传给程序，日志里不会打印。
+# - 草稿：存成这次运行的产物（Artifacts，保留 30 天），同时贴在运行页面的 Summary 里。
+#   不提交回仓库：草稿没经过人审，不该进代码历史。公开仓库的运行页面和产物别人也能看到。
+# - 系统不会自动发布任何内容。
+name: daily
+
+on:
+  schedule:
+    - cron: "17 23 * * *"
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "用哪个模型（auto = 有哪个 key 用哪个，都没有就 mock）"
+        type: choice
+        options: [auto, mock, deepseek, qwen]
+        default: auto
+      sources:
+        description: "信息源（live = arXiv + GitHub 真实数据，fixture = 仓库里的虚构示例）"
+        type: choice
+        options: [live, fixture]
+        default: live
+      picks:
+        description: "选几条写"
+        type: string
+        default: "3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装
+        run: pip install -e ".[dev,llm]"
+
+      - name: 单元测试
+        run: pytest
+
+      - name: 选模型
+        id: pick
+        env:
+          WANTED: ${{ inputs.model || 'auto' }}
+          HAS_DEEPSEEK: ${{ secrets.DEEPSEEK_API_KEY != '' }}
+          HAS_QWEN: ${{ secrets.DASHSCOPE_API_KEY != '' }}
+        run: |
+          case "$WANTED" in
+            auto)
+              if [ "$HAS_DEEPSEEK" = "true" ]; then model=deepseek
+              elif [ "$HAS_QWEN" = "true" ]; then model=qwen
+              else model=mock; fi ;;
+            deepseek)
+              [ "$HAS_DEEPSEEK" = "true" ] || { echo "::error::没有设置 DEEPSEEK_API_KEY，见 README「部署到 GitHub Actions」"; exit 1; }
+              model=deepseek ;;
+            qwen)
+              [ "$HAS_QWEN" = "true" ] || { echo "::error::没有设置 DASHSCOPE_API_KEY，见 README「部署到 GitHub Actions」"; exit 1; }
+              model=qwen ;;
+            *) model=mock ;;
+          esac
+          echo "model=$model" >> "$GITHUB_OUTPUT"
+          echo "这次用的模型：$model"
+
+      # 把上次的数据库接着用，这样去重能和前几天的比，写过的新闻不会再写一遍。
+      # 按模型分开存：换成真实模型后从头开始，不受模拟模型写过的影响。
+      - name: 取回上次的数据库
+        uses: actions/cache/restore@v4
+        with:
+          path: data/newsroom.db
+          key: newsroom-db-${{ steps.pick.outputs.model }}-${{ github.run_id }}
+          restore-keys: newsroom-db-${{ steps.pick.outputs.model }}-
+
+      - name: 跑每日流程
+        id: run
+        env:
+          MODEL: ${{ steps.pick.outputs.model }}
+          SOURCES: ${{ inputs.sources || 'live' }}
+          PICKS: ${{ inputs.picks || '3' }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+          # 只用来调 GitHub 搜索接口（限额更高），权限是上面的只读
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          case "$PICKS" in ''|*[!0-9]*) echo "::error::picks 要填数字"; exit 1 ;; esac
+          if [ "$SOURCES" = "fixture" ]; then
+            export NEWSROOM_SOURCES=fixture; live=""
+          else
+            export NEWSROOM_SOURCES=rss,github; live="--live-fetch"
+          fi
+          set +e
+          newsroom run --model "$MODEL" --picks "$PICKS" $live | tee run.log
+          code=${PIPESTATUS[0]}
+          set -e
+          # 1 = 今天没有产出草稿（比如周末 arXiv 不更新、候选都写过了），不算失败
+          if [ "$code" = "1" ]; then
+            echo "::warning::这次没有产出草稿"
+          elif [ "$code" != "0" ]; then
+            exit "$code"
+          fi
+
+      - name: 导出草稿
+        if: always() && steps.run.outcome == 'success'
+        run: |
+          newsroom review export --run latest --out out/drafts
+          newsroom cost > cost.log || true
+          {
+            echo "## 每日运行（模型：${{ steps.pick.outputs.model }}）"
+            echo '```'
+            cat run.log
+            echo '```'
+            echo '```'
+            cat cost.log
+            echo '```'
+            for f in out/drafts/*.md; do
+              [ -e "$f" ] || continue
+              echo "---"
+              cat "$f"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 上传草稿
+        if: always() && steps.run.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: drafts-${{ github.run_number }}
+          path: |
+            out/drafts/
+            run.log
+            cost.log
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: 存下这次的数据库
+        if: always() && steps.run.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: data/newsroom.db
+          key: newsroom-db-${{ steps.pick.outputs.model }}-${{ github.run_id }}

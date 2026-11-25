@@ -3,7 +3,7 @@
     newsroom summarize <网址或文件>   第 1 周：一篇文章 → 结构化摘要
     newsroom collect                  只跑采集和去重
     newsroom run                      每天的完整流程：采集 → 选题 → 写 → 核查 → 改写 → 进审核台
-    newsroom review list|show|approve|reject
+    newsroom review list|show|approve|reject|export
     newsroom eval [--compare deepseek,qwen,claude]
     newsroom react "问题"             手撕 ReAct 演示
     newsroom cost                     看每个环节花了多少钱
@@ -26,7 +26,7 @@ from .evals.runner import evaluate, load_cases, save_reports, to_markdown
 from .gateway.base import GatewayError
 from .gateway.gateway import ModelGateway
 from .orchestrator import run_daily
-from .review import approve, format_draft, reject
+from .review import approve, export_for_review, format_draft, reject
 from .store import Store
 from .summarize import load_source, summarize
 from .tools.fetcher import FetchBlocked, PageFetcher
@@ -92,6 +92,19 @@ def cmd_review(settings: Settings, args: argparse.Namespace) -> int:
             print("没有草稿。先跑 newsroom run。")
         for d in drafts:
             print(format_draft(d, full=False))
+        return 0
+    if args.action == "export":
+        # 把草稿连同核查结果导出成 Markdown，给 GitHub Actions 存成产物，或者在别的地方审
+        out_dir = Path(args.out) if args.out else settings.out_dir / "drafts"
+        drafts = store.list_drafts(None if args.status == "all" else args.status)
+        if args.draft_id:
+            drafts = [d for d in drafts if d["id"] == args.draft_id]
+        if args.run:
+            run_id = store.last_run_id() if args.run == "latest" else args.run
+            drafts = [d for d in drafts if d["run_id"] == run_id]
+        for d in drafts:
+            print(export_for_review(d, out_dir))
+        print(f"导出了 {len(drafts)} 篇草稿到 {out_dir}", file=sys.stderr)
         return 0
     if not args.draft_id:
         print("要给草稿 id，比如：newsroom review show 1a2b3c4d")
@@ -194,11 +207,13 @@ def build_parser() -> argparse.ArgumentParser:
     r.set_defaults(fn=cmd_run)
 
     v = add("review", help="审核台")
-    v.add_argument("action", choices=["list", "show", "approve", "reject"])
+    v.add_argument("action", choices=["list", "show", "approve", "reject", "export"])
     v.add_argument("draft_id", nargs="?")
     v.add_argument("--status", default="pending", choices=["pending", "approved", "rejected", "all"])
     v.add_argument("--note", default="", help="审核意见")
     v.add_argument("--force", action="store_true", help="有警告也通过")
+    v.add_argument("--out", help="export 导出到哪个目录，默认 out/drafts")
+    v.add_argument("--run", help="export 只导出这次运行的草稿；latest 表示最近一次")
     v.set_defaults(fn=cmd_review)
 
     e = add("eval", help="跑评测")

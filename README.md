@@ -12,7 +12,7 @@
 | `newsroom collect` | 抓信息源、去重、入库 | 第 2 周 |
 | `newsroom run` | 完整流程：采集 → 选题 → 写 → 核查 → 改写 → 进审核台 | 第 2、7 周 |
 | `newsroom react "问题"` | 手撕 ReAct 演示（纯文本解析，不用 function calling） | 第 2 周 |
-| `newsroom review list/show/approve/reject` | 命令行审核台，通过的导出成 Markdown | 第 7 周 |
+| `newsroom review list/show/approve/reject/export` | 命令行审核台，通过的导出成 Markdown；`export` 把待审草稿连同核查结果导出 | 第 7 周 |
 | `newsroom eval [--compare deepseek,qwen,claude]` | 金标准评测，比较多个模型的分数、成本、耗时 | 第 3、8 周 |
 | `newsroom cost` | 每个环节花了多少 token 和钱 | 第 8 周 |
 
@@ -50,7 +50,7 @@ cd ai-news-desk
 python -m venv .venv && source .venv/bin/activate   # Windows 用 .venv\Scripts\activate
 pip install -e ".[dev]"
 
-pytest                     # 69 个测试
+pytest                     # 75 个测试
 newsroom run               # 用示例数据跑一遍完整流程
 newsroom review list       # 看草稿
 newsroom review show <草稿id>
@@ -97,9 +97,11 @@ newsroom summarize https://api-docs.deepseek.com/ --model qwen
 - **真实信息源**：把 `config.toml` 里 arXiv 和 GitHub 两个源的 `enabled` 改成 `true`，跑的时候加 `--live-fetch` 才会读真实网页。只有 `fetch_allowlist` 里的域名能被访问。
 - **比较模型**：`newsroom eval --compare deepseek,qwen --judge qwen`。评审最好固定用一个和被评模型不同的模型，分数才可比。
 
-### 在云端电脑上试过的真实数据
+### 用真实数据试过
 
-搭建时用 GitHub 信息源（最近 7 天 `topic:llm-agent` 的新仓库）跑过一次：抓到 10 个真实仓库，研究员读了几个仓库的 README，产出 2 篇草稿。用的还是模拟模型，所以只验证了「真实数据能走通流水线」，没有验证写作质量。这台机器的网络打不开 arXiv 等网站，所以默认用示例数据。
+搭建时用 GitHub 信息源（最近 7 天 `topic:llm-agent` 的新仓库）跑过一次：抓到 10 个真实仓库，研究员读了几个仓库的 README，产出 2 篇草稿。用的还是模拟模型，所以只验证了「真实数据能走通流水线」，没有验证写作质量。
+
+本机默认用示例数据，是为了不联网、不要 key 也能跑通和测试。想临时换成真实信息源，不用改配置文件，设环境变量 `NEWSROOM_SOURCES=rss,github` 就行（会忽略 `enabled`），GitHub Actions 每天定时跑就是这么做的。
 
 ## 评测
 
@@ -108,7 +110,7 @@ newsroom summarize https://api-docs.deepseek.com/ --model qwen
 - **6 条写作样例**：给原文，评写手和改写。打分器：格式（各平台长度限制）、来源（是不是引用了给定的一手来源）、事实（每条 claim 能不能在原文里找到，代码判断）、风格（标题党用词、必须出现和不能出现的词）、LLM 评审（1 到 5 分）。
 - **2 条核查样例**：草稿里故意埋了错（32K 写成 128K、编造的结论、「输出价格不变」写成「也降了一半」），看核查员能不能抓出来，又不冤枉对的。
 
-总分按权重加起来，事实占得最重。CI（`.github/workflows/ci.yml`）每次提交跑测试和 `newsroom eval --min-score 0.9`，分数掉了就失败。
+总分按权重加起来，事实占得最重。CI（`.github/workflows/ci.yml`）每次提交跑测试和 `newsroom eval --min-score 0.9`，分数掉了就失败。每天定时跑的流程在 `.github/workflows/daily.yml`，见下面「部署到 GitHub Actions」。
 
 方案第 3 周的验收是 50 条样本，而且要用你自己写过的真实内容。现在的 8 条只是让评测能跑起来的骨架，样本要你来攒。
 
@@ -150,7 +152,7 @@ src/newsroom/
 data/fixtures/         示例数据（虚构）
 data/voice.md          语气档案：把你写过的好帖子贴进去
 evals/golden.jsonl     金标准样例
-tests/                 69 个测试
+tests/                 75 个测试
 ```
 
 ## 已知限制
@@ -173,6 +175,36 @@ tests/                 69 个测试
 | 第 8 周 | 接链路追踪和成本面板；vLLM 部署开源 Qwen 小模型接管分类和去重；一轮注入红队测试；Docker + K8s |
 | 第 9、10 周 | README 首屏换成你跑出来的真实评测表和单篇成本、录 demo、写踩坑复盘，开始投递 |
 
-## 关于部署
+## 部署到 GitHub Actions（每天自动跑）
 
-这台云端电脑只是搭建和测试用的，闲置一段时间就会被回收，不能 24 小时跑。要每天定时跑，需要你自己部署到一台常开的机器上（比如国内的云服务器）：装好 Python 和这个项目，在那台机器上设好 key 的环境变量，再用 cron 或 systemd 每天执行一次 `newsroom run`。
+`.github/workflows/daily.yml` 每天自动跑一次完整流程，不用自己的服务器，公开仓库免费。
+
+- **时间**：每天台北时间早上 7:17 左右（UTC 23:17）。GitHub 高峰时可能晚几分钟到半小时。
+- **信息源**：arXiv cs.AI 和 GitHub `topic:llm-agent` 的真实数据，研究员可以读白名单里的网页。
+- **模型**：仓库 Secrets 里有 `DEEPSEEK_API_KEY` 就用 DeepSeek；没有再看 `DASHSCOPE_API_KEY`，有就用通义千问；都没有就用模拟模型，照样能跑通。
+- **去重**：上次的数据库用 Actions 缓存接着用，写过的新闻不会再写。换模型后从头开始。
+- **草稿**：每次运行的页面上，Summary 里直接贴着这次的草稿（带提醒和事实核查结果）；同样的内容也存成 Artifacts（`drafts-运行编号`，保留 30 天），可以下载。草稿不提交回仓库，因为没经过人审。
+- **不会自动发布任何内容。**
+
+### 填上模型 key
+
+key 只放在仓库 Secrets 里，代码只从环境变量读，日志里不会打印。
+
+1. 打开仓库页面，点上方的 **Settings**
+2. 左边栏点 **Secrets and variables** → **Actions**
+3. 在 **Repository secrets** 那里点 **New repository secret**
+4. **Name** 填 `DEEPSEEK_API_KEY`，**Secret** 粘贴你的 DeepSeek key，点 **Add secret**
+5. 想用通义千问，再加一个：**Name** 填 `DASHSCOPE_API_KEY`，**Secret** 粘贴百炼控制台的 key
+
+两个都填了的话默认用 DeepSeek，手动运行时可以选。名字要一字不差，大小写也一样。
+
+### 手动跑一次
+
+仓库页面点 **Actions** → 左边选 **daily** → 右边 **Run workflow**。可以选模型（auto、mock、deepseek、qwen）、信息源（live 真实数据、fixture 示例数据）和写几条。跑完点进这次运行，Summary 里就是草稿。
+
+### 要知道的几件事
+
+- **公开仓库谁都能看到运行日志、Summary 和 Artifacts**，草稿也一样。介意的话把仓库改成私有（私有仓库每月有免费额度，超出要付费）。
+- **调用模型的钱**从你的 DeepSeek 或百炼账户扣，GitHub 不收费。先用 `newsroom cost` 看看单篇成本。
+- **仓库 60 天没有任何提交，GitHub 会自动停掉定时任务**，会先发邮件提醒。到 Actions 页面点一下 **Enable workflow** 就能恢复。
+- 以后做网页版审核台，需要一台常开的机器（云服务器或 Render 这类平台），GitHub Actions 只适合定时跑批。

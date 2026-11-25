@@ -79,6 +79,23 @@ class Settings:
         return override or os.environ.get("NEWSROOM_MODEL") or self.default_model
 
 
+def select_sources(cfgs: list[dict[str, Any]], wanted: str | None = None) -> list[dict[str, Any]]:
+    """选用哪些信息源。
+
+    默认按 config.toml 里的 enabled。设了环境变量 NEWSROOM_SOURCES（逗号分隔的类型，
+    比如 "rss,github"）就只用这几类、忽略 enabled：GitHub Actions 每天定时跑时用真实信息源，
+    本机和测试仍然默认用示例数据，不用改配置文件。
+    """
+    if not wanted or not wanted.strip():
+        return [dict(s) for s in cfgs if s.get("enabled", True)]
+    types = {t.strip() for t in wanted.split(",") if t.strip()}
+    known = {s["type"] for s in cfgs}
+    unknown = types - known
+    if unknown:
+        raise ValueError(f"NEWSROOM_SOURCES 里有 config.toml 没配的类型：{'、'.join(sorted(unknown))}")
+    return [dict(s) for s in cfgs if s["type"] in types]
+
+
 def load_settings(path: str | Path | None = None) -> Settings:
     cfg_path = Path(path) if path else PROJECT_ROOT / "config.toml"
     root = cfg_path.resolve().parent
@@ -89,7 +106,7 @@ def load_settings(path: str | Path | None = None) -> Settings:
     models = {
         name: ModelConfig(name=name, **body) for name, body in raw.get("models", {}).items()
     }
-    sources = [s for s in raw.get("sources", []) if s.get("enabled", True)]
+    sources = select_sources(raw.get("sources", []), os.environ.get("NEWSROOM_SOURCES"))
     for s in sources:
         if "path" in s:
             s["path"] = str((root / s["path"]).resolve())

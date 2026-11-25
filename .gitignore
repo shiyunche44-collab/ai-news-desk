@@ -9,3 +9,8 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+.env.*
+!.env.example
+# GitHub Actions 每日运行的日志
+run.log
+cost.log
