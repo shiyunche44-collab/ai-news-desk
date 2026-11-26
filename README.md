@@ -1,6 +1,6 @@
 # AI 资讯编辑部（第一版）
 
-每天自动找 AI 新闻，挑出值得写的，写成草稿，逐条核查事实，再改写成 X、小红书、视频号三个版本，放进审核台等你点通过。**系统不会自动发布任何内容。**
+每天自动找 AI 新闻，挑出值得写的，写成草稿，逐条核查事实，再改写成一条 X 帖子，放进审核台等你点通过。**系统不会自动发布任何内容。**
 
 这是「AI 开发岗面试：Agent 项目方案与学习规划」里推荐的项目，第一版做完了计划的第 1 到 3 周（模型网关、手写 agent 循环、手撕 ReAct、评测），并把整条流水线的骨架搭好了。不用任何 agent 框架，核心只依赖 pydantic。
 
@@ -26,7 +26,7 @@ flowchart LR
   C --> DB[(SQLite)]
   DB --> R[选题研究员<br/>唯一的 agent<br/>工具：检索 / 读原文 / 查重]
   R --> G{代码护栏<br/>id 真实？一手来源？}
-  G --> W[写手] --> F[事实核查<br/>代码预检 + 模型逐条核对] --> A[平台改写<br/>X / 小红书 / 视频号]
+  G --> W[写手] --> F[事实核查<br/>代码预检 + 模型逐条核对] --> A[平台改写<br/>X 帖子]
   A --> V[审核台<br/>人点通过才导出]
   subgraph 模型网关
     M[路由 / 重试 / 记账<br/>DeepSeek · 通义千问 · Claude · mock]
@@ -50,7 +50,7 @@ cd ai-news-desk
 python -m venv .venv && source .venv/bin/activate   # Windows 用 .venv\Scripts\activate
 pip install -e ".[dev]"
 
-pytest                     # 77 个测试
+pytest                     # 78 个测试
 newsroom run               # 用示例数据跑一遍完整流程
 newsroom review list       # 看草稿
 newsroom review show <草稿id>
@@ -107,7 +107,7 @@ newsroom summarize https://api-docs.deepseek.com/ --model qwen
 
 金标准样例在 `evals/golden.jsonl`，现在 8 条，全是虚构的示例：
 
-- **6 条写作样例**：给原文，评写手和改写。打分器：格式（各平台长度限制）、来源（是不是引用了给定的一手来源）、事实（每条 claim 能不能在原文里找到，代码判断）、风格（标题党用词、必须出现和不能出现的词）、LLM 评审（1 到 5 分）。
+- **6 条写作样例**：给原文，评写手和改写。打分器：格式（X 的长度限制）、来源（是不是引用了给定的一手来源）、事实（每条 claim 能不能在原文里找到，代码判断）、风格（标题党用词、必须出现和不能出现的词）、LLM 评审（1 到 5 分）。
 - **2 条核查样例**：草稿里故意埋了错（32K 写成 128K、编造的结论、「输出价格不变」写成「也降了一半」），看核查员能不能抓出来，又不冤枉对的。
 
 总分按权重加起来，事实占得最重。CI（`.github/workflows/ci.yml`）每次提交跑测试和 `newsroom eval --min-score 0.9`，分数掉了就失败。每天定时跑的流程在 `.github/workflows/daily.yml`，见下面「部署到 GitHub Actions」。
@@ -152,7 +152,7 @@ src/newsroom/
 data/fixtures/         示例数据（虚构）
 data/voice.md          语气档案：把你写过的好帖子贴进去
 evals/golden.jsonl     金标准样例
-tests/                 77 个测试
+tests/                 78 个测试
 ```
 
 ## 已知限制

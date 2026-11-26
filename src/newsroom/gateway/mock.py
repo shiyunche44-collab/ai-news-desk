@@ -149,16 +149,7 @@ def _adapter(req: ChatRequest) -> Message:
     while x_weighted_length(x_post) > 250:
         x_post = x_post[:-2]
     x_post = f"{x_post} {url}".strip()
-    paras = [p for p in body.split("\n\n") if p.strip()]
-    script = "今天说一条 AI 新闻。" + "".join(paras)
-    while len(script) < 150:
-        script += "如果你也在关注 AI，记得点个关注，我每天用大白话讲一条。"
-    return _json_msg({
-        "x_post": x_post,
-        "xiaohongshu": {"title": title[:20], "body": "\n\n".join(paras[:4]),
-                        "tags": ["AI", "大模型", "AI资讯"]},
-        "shipinhao_script": script[:400],
-    })
+    return _json_msg({"x_post": x_post})
 
 
 def _summarize(req: ChatRequest) -> Message:

@@ -5,7 +5,7 @@ import json
 from newsroom.agents.adapter import platform_problems, x_weighted_length
 from newsroom.agents.fact_checker import check_draft, missing_numbers
 from newsroom.agents.researcher import research
-from newsroom.agents.schemas import Claim, Draft, PlatformVersions, XiaohongshuNote
+from newsroom.agents.schemas import Claim, Draft, PlatformVersions
 from newsroom.collect.pipeline import collect
 from newsroom.collect.sources import build_sources
 from newsroom.gateway.mock import HANDLERS, MockProvider
@@ -24,12 +24,17 @@ def test_x_weighted_length():
 
 
 def test_platform_problems():
-    ok = PlatformVersions(x_post="短帖", xiaohongshu=XiaohongshuNote(title="标题", body="正文"),
-                          shipinhao_script="字" * 200)
-    assert platform_problems(ok) == []
-    bad = PlatformVersions(x_post="字" * 150, xiaohongshu=XiaohongshuNote(title="长" * 21, body=""),
-                           shipinhao_script="短")
-    assert len(platform_problems(bad)) == 3
+    assert platform_problems(PlatformVersions(x_post="短帖")) == []
+    assert platform_problems(PlatformVersions(x_post="字" * 140)) == []  # 正好 280
+    problems = platform_problems(PlatformVersions(x_post="字" * 150))
+    assert len(problems) == 1 and "X 帖子超长" in problems[0]
+
+
+def test_only_x_version():
+    # 只出 X：模型多给了小红书、视频号字段也不会进草稿
+    v = PlatformVersions.model_validate({"x_post": "帖子", "xiaohongshu": {"title": "t", "body": "b"},
+                                         "shipinhao_script": "稿"})
+    assert v.model_dump() == {"x_post": "帖子"}
 
 
 def test_missing_numbers():

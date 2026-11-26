@@ -23,7 +23,8 @@ def test_full_cli_flow(run, settings):
     code, out = run("review", "list")
     draft_id = out.split("[")[1].split("]")[0]
     code, out = run("review", "show", draft_id)
-    assert "事实核查" in out and "视频号口播稿" in out
+    assert "事实核查" in out and "X（计数" in out
+    assert "小红书" not in out and "视频号" not in out
     code, out = run("review", "approve", draft_id)
     assert code == 1 and "--force" in out
     code, out = run("review", "approve", draft_id, "--force")
@@ -61,8 +62,9 @@ def test_review_export(run, settings, tmp_path):
     assert code == 0 and len(files) == 2
     text = files[0].read_text(encoding="utf-8")
     # 待审稿要带上提醒和逐条核查结论，成稿部分和 approve 导出的一样
-    for part in ("## 提醒", "示例数据（虚构）", "## 事实核查", "## 正文", "## 来源", "## X", "## 视频号口播稿"):
+    for part in ("## 提醒", "示例数据（虚构）", "## 事实核查", "## 正文", "## 来源", "## X"):
         assert part in text
+    assert "小红书" not in text and "视频号" not in text  # 只出 X 版
     code, _ = run("review", "export", "--status", "approved", "--out", str(tmp_path / "none"))
     assert code == 0 and not list((tmp_path / "none").glob("*.md"))
     # 再跑一次：--run latest 只导出最近这次运行的草稿，不带上前一次的

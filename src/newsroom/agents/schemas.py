@@ -52,16 +52,14 @@ class FactCheckReport(BaseModel):
         return all(v.status == "supported" for v in self.verdicts)
 
 
-class XiaohongshuNote(BaseModel):
-    title: str = Field(description="小红书标题，20 字以内")
-    body: str
-    tags: list[str] = Field(default_factory=list, max_length=10)
-
-
 class PlatformVersions(BaseModel):
+    """各平台版本。现在只出 X：小红书和视频号的账号改做别的内容了，AI 资讯稿只发 X。
+
+    以后要加平台：在这里加字段，在 ADAPTER_SYSTEM 里写要求，在 platform_problems 里加长度检查，
+    review.py 里加导出。
+    """
+
     x_post: str = Field(description="X 帖子，按 X 的计数规则不超过 280（一个汉字算 2）")
-    xiaohongshu: XiaohongshuNote
-    shipinhao_script: str = Field(description="视频号口播稿，大约 60 秒")
 
 
 class Summary(BaseModel):

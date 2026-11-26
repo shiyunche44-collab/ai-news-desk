@@ -1,4 +1,4 @@
-"""平台改写：一篇草稿 → X、小红书、视频号三个版本，再用代码检查各平台的硬限制。"""
+"""平台改写：一篇草稿 → 一条 X 帖子，再用代码检查 X 的长度限制。"""
 
 from __future__ import annotations
 
@@ -32,10 +32,6 @@ def platform_problems(v: PlatformVersions) -> list[str]:
     problems = []
     if x_weighted_length(v.x_post) > 280:
         problems.append(f"X 帖子超长（计数 {x_weighted_length(v.x_post)}，上限 280）")
-    if len(v.xiaohongshu.title) > 20:
-        problems.append(f"小红书标题超过 20 字（{len(v.xiaohongshu.title)} 字）")
-    if not (150 <= len(v.shipinhao_script) <= 400):
-        problems.append(f"视频号口播稿 {len(v.shipinhao_script)} 字，建议 150 到 400 字（约 40 到 90 秒）")
     return problems
 
 

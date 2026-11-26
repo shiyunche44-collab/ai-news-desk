@@ -30,26 +30,18 @@ def format_draft(d: dict[str, Any], full: bool = True) -> str:
     versions = d.get("versions") or {}
     if versions:
         x = versions.get("x_post", "")
-        xhs = versions.get("xiaohongshu", {})
-        lines += ["", f"X（计数 {x_weighted_length(x)}/280）：", x,
-                  "", f"小红书：{xhs.get('title', '')}", xhs.get("body", ""),
-                  "标签：" + "、".join(xhs.get("tags", [])),
-                  "", "视频号口播稿：", versions.get("shipinhao_script", "")]
+        lines += ["", f"X（计数 {x_weighted_length(x)}/280）：", x]
     return "\n".join(lines)
 
 
 def _final_sections(d: dict[str, Any]) -> list[str]:
-    """成稿部分：正文、来源和各平台版本。"""
+    """成稿部分：正文、来源和 X 版本。以前存下的草稿里如果还有小红书、视频号版本，不再导出。"""
     v = d.get("versions") or {}
-    xhs = v.get("xiaohongshu", {})
     sources = sorted({c["source_url"] for c in d.get("claims") or []})
     return [
         d["body"], "",
         "## 来源", *[f"- {u}" for u in sources], "",
         "## X", v.get("x_post", ""), "",
-        f"## 小红书：{xhs.get('title', '')}", xhs.get("body", ""), "",
-        " ".join("#" + t for t in xhs.get("tags", [])), "",
-        "## 视频号口播稿", v.get("shipinhao_script", ""), "",
     ]
 
 

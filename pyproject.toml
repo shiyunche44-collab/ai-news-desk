@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ai-news-desk"
 version = "0.1.0"
-description = "AI 资讯编辑部：每天找 AI 新闻、写草稿、核查事实、改写成各平台版本的多 agent 系统（第一版）"
+description = "AI 资讯编辑部：每天找 AI 新闻、写草稿、核查事实、改写成 X 帖子的多 agent 系统（第一版）"
 readme = "README.md"
 requires-python = ">=3.10"
 # 核心只依赖 pydantic：模拟模型、测试、评测都不需要任何 API key 和网络。

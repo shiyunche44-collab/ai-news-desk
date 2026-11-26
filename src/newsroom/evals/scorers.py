@@ -43,7 +43,7 @@ def score_format(versions: PlatformVersions | None, problems: list[str]) -> Scor
         return Score("format", 0.0, "平台改写没产出合法结构")
     if problems:
         return Score("format", max(0.0, 1 - 0.34 * len(problems)), "；".join(problems))
-    return Score("format", 1.0, "三个平台版本都符合长度限制")
+    return Score("format", 1.0, "X 版本符合长度限制")
 
 
 def score_sources(draft: Draft, source_url: str, primary_domains: list[str]) -> Score:
